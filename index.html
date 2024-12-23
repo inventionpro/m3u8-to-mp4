@@ -45,10 +45,10 @@
     <video controls id="video"></video>
     <script type="module">
       import { FFmpeg } from './lib/@ffmpeg/ffmpeg/dist/esm/index.js';
-      import { fetchFile, toBlobURL } from 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js';
+      import { fetchFile, toBlobURL } from './lib/@ffmpeg/util/dist/esm/index.js';
 
       const ffmpeg = new FFmpeg();
-      const base = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm';
+      const base = './lib/@ffmpeg/core-mt/dist/esm';
       await ffmpeg.load({
         coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
