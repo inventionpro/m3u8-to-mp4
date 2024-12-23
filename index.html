@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>M3U8 To MP4 Online</title>
+    <meta name="description" content="Convert m3u8 files into mp4s online.">
+
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta property="og:image" content="https://fsh.plus/fsh.png">
+    <meta name="theme-color" content="#a89c9b">
+
+    <link rel="stylesheet" href="https://fsh.plus/media/style.css">
+  </head>
+  <body>
+    <div id="loading">
+      <p>Loading FFmpeg, please wait...</p>
+    </div>
+    <label>URL: <input type="url" id="url"></label>
+    <button id="convert">Convert</button>
+    <br>
+    <video controls id="video"></video>
+    <script>
+      import { FFmpeg } from 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js';
+      import { fetchFile, toBlobURL } from 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js';
+
+      const ffmpeg = new FFmpeg();
+      ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      })
+        .then(()=>{
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('convert').onclick = async function(){
+            await ffmpeg.writeFile('input.webm', await fetchFile(document.getElementById('url').value));
+            await ffmpeg.exec(['-i', 'input.webm', '-c', 'copy', '-bsf:a aac_adtstoasc', 'output.mp4']);
+            const data = await ffmpeg.readFile('output.mp4');
+            document.getElementById('video').src = URL.createObjectURL(new Blob([data.buffer], {type: 'video/mp4'}));
+          }
+        })
+    </script>
+  </body>
+</html>
