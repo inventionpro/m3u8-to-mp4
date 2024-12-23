@@ -49,20 +49,18 @@
 
       const ffmpeg = new FFmpeg();
       const base = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm';
-      ffmpeg.load({
+      await ffmpeg.load({
         coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
         wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
         workerURL: await toBlobURL(`${base}/ffmpeg-core.worker.js`, 'text/javascript')
-      })
-        .then(()=>{
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('convert').onclick = async function(){
-            await ffmpeg.writeFile('input.webm', await fetchFile(document.getElementById('url').value));
-            await ffmpeg.exec(['-i', 'input.webm', '-c', 'copy', '-bsf:a aac_adtstoasc', 'output.mp4']);
-            const data = await ffmpeg.readFile('output.mp4');
-            document.getElementById('video').src = URL.createObjectURL(new Blob([data.buffer], {type: 'video/mp4'}));
-          }
-        })
+      });
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('convert').onclick = async function(){
+        await ffmpeg.writeFile('input.webm', await fetchFile(document.getElementById('url').value));
+        await ffmpeg.exec(['-i', 'input.webm', '-c', 'copy', '-bsf:a aac_adtstoasc', 'output.mp4']);
+        const data = await ffmpeg.readFile('output.mp4');
+        document.getElementById('video').src = URL.createObjectURL(new Blob([data.buffer], {type: 'video/mp4'}));
+      }
     </script>
   </body>
 </html>
