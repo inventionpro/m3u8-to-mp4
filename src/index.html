@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>M3U8 To MP4 Online</title>
+    <meta name="description" content="Convert m3u8 files into mp4s online.">
+
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#a89c9b">
+
+    <link rel="stylesheet" href="https://fsh.plus/media/style.css">
+    <style>
+      body {
+        display: flex;
+        gap: 5px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100vw;
+        height: 100vh;
+      }
+      #loading {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--bg-1);
+        z-index: 999;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading">
+      <p>Loading FFmpeg, please wait...</p>
+    </div>
+    <label>URL: <input type="url" id="url" placeholder="https://example.com/playlist.m3u8"></label>
+    <button id="convert">Convert</button>
+    <video controls id="video"></video>
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
