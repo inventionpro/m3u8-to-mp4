@@ -34,6 +34,7 @@
         z-index: 999;
       }
     </style>
+    <script type="module" crossorigin src="/assets/index-CrmSZbdT.js"></script>
   </head>
   <body>
     <div id="loading">
@@ -41,26 +42,6 @@
     </div>
     <label>URL: <input type="url" id="url"></label>
     <button id="convert">Convert</button>
-    <br>
     <video controls id="video"></video>
-    <script type="module">
-      import { FFmpeg } from './lib/@ffmpeg/ffmpeg/dist/esm/index.js';
-      import { fetchFile, toBlobURL } from './lib/@ffmpeg/util/dist/esm/index.js';
-
-      const ffmpeg = new FFmpeg();
-      const base = './lib/@ffmpeg/core-mt/dist/esm';
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
-        workerURL: await toBlobURL(`${base}/ffmpeg-core.worker.js`, 'text/javascript')
-      });
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('convert').onclick = async function(){
-        await ffmpeg.writeFile('input.webm', await fetchFile(document.getElementById('url').value));
-        await ffmpeg.exec(['-i', 'input.webm', '-c', 'copy', '-bsf:a aac_adtstoasc', 'output.mp4']);
-        const data = await ffmpeg.readFile('output.mp4');
-        document.getElementById('video').src = URL.createObjectURL(new Blob([data.buffer], {type: 'video/mp4'}));
-      }
-    </script>
   </body>
 </html>
