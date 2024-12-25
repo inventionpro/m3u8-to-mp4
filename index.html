@@ -33,14 +33,17 @@
         z-index: 999;
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-BhP8gD7R.js"></script>
+    <script type="module" crossorigin src="./assets/index-BlckS3KC.js"></script>
   </head>
   <body>
     <div id="loading">
       <p>Loading FFmpeg, please wait...</p>
     </div>
-    <label>URL: <input type="url" id="url" placeholder="https://example.com/playlist.m3u8"></label>
-    <button id="convert">Convert</button>
+    <span>
+      <label>URL: <input type="url" id="url" placeholder="https://example.com/playlist.m3u8"></label>
+      <button id="convert">Convert</button>
+    </span>
+    <p>Status: <span id="status">Write a url and click convert</span></p>
     <video controls id="video"></video>
   </body>
 </html>

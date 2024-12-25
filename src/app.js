@@ -16,11 +16,17 @@ const base = "https://unpkg.com/@ffmpeg/core@0.12.2/dist/esm";
   document.getElementById('loading').style.display = 'none';
 })()
 
+function setStatus(txt) {
+  document.getElementById('status').innerText = txt;
+}
+
 async function fetchM3U8(url) {
+  setStatus('Fetching...');
   let content = await fetch(url);
   content = await content.text();
   if (content.includes('#EXT-X-STREAM-INF')) {
     console.log('Fetched playlist');
+    setStatus('Playlist fetched, fetching highest quality video...');
     let bm = content
       .match(/^#EXT-X-STREAM-INF:.+?$/gm)
       .map(c=>Number(c.match(/BANDWIDTH=[0-9]+?,/)[0]
@@ -32,22 +38,27 @@ async function fetchM3U8(url) {
     let u = content.split('\n')[g+1];
     let uu = new URL(u, url).href;
     console.log('Fetching video: '+uu)
+    setStatus('Video fetched');
     let newCon = await fetchM3U8(uu);
     return [uu, newCon[1]];
   } else {
-    console.log('Fetched video')
+    console.log('Fetched video');
+    setStatus('Video fetched');
     return [url, content];
   }
 }
 async function fetchSegments(m3u8) {
+  setStatus('Fetching segments...');
   const baseUrl = m3u8[0].substring(0, m3u8[0].lastIndexOf("/") + 1);
   const lines = m3u8[1].split("\n");
   const segments = [];
 
-  for (const line of lines) {
+  for (let i = 0; i<lines.length; i++) {
+    let line = lines[i];
     if (line && !line.startsWith("#")) {
       const segmentUrl = new URL(line, baseUrl).href;
       console.log(`Fetching segment: ${segmentUrl}`);
+      setStatus(`Fetching segment ${i}...`);
       segments.push({ name: line, data: await fetchFile(segmentUrl) });
     }
   }
@@ -59,11 +70,14 @@ document.getElementById('convert').onclick = async function(){
   let m3u8 = await fetchM3U8(url);
   let segments = await fetchSegments(m3u8);
 
+  setStatus('Writing files...');
   for (let { name, data } of segments) {
     await ffmpeg.writeFile(name, data);
   }
 
+  setStatus('Writing playlist...');
   await ffmpeg.writeFile("playlist.m3u8", m3u8[1]);
+  setStatus('Converting...');
   await ffmpeg.exec([
     '-allowed_extensions', 'ALL',
     '-i', 'playlist.m3u8',
@@ -73,5 +87,6 @@ document.getElementById('convert').onclick = async function(){
   ]);
   const data = await ffmpeg.readFile('output.mp4');
   const videoBlob = new Blob([data.buffer], { type: 'video/mp4' });
+  setStatus('Done!');
   document.getElementById('video').src = URL.createObjectURL(videoBlob);
 }
