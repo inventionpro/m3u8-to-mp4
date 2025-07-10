@@ -22,7 +22,8 @@ function setStatus(txt) {
 
 async function fetchM3U8(url) {
   setStatus('Fetching...');
-  let content = await fetch(url);
+  let proxy = document.getElementById('proxy').checked;
+  let content = await fetch(proxy?'https://api.fsh.plus/file?url='+encodeURIComponent(url):url);
   content = await content.text();
   if (content.includes('#EXT-X-STREAM-INF')) {
     console.log('Fetched playlist');
@@ -53,12 +54,15 @@ async function fetchSegments(m3u8) {
   const lines = m3u8[1].split("\n");
   const segments = [];
 
+  let proxy = document.getElementById('proxy').checked;
+
   for (let i = 0; i<lines.length; i++) {
     let line = lines[i];
     if (line && !line.startsWith("#")) {
-      const segmentUrl = new URL(line, baseUrl).href;
+      let segmentUrl = new URL(line, baseUrl).href;
       console.log(`Fetching segment: ${segmentUrl}`);
       setStatus(`Fetching segment ${i}...`);
+      if (proxy) segmentUrl = 'https://api.fsh.plus/file?url='+encodeURIComponent(segmentUrl);
       segments.push({ name: line, data: await fetchFile(segmentUrl) });
     }
   }

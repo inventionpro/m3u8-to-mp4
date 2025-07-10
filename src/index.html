@@ -32,6 +32,9 @@
         background-color: var(--bg-1);
         z-index: 999;
       }
+      video {
+        max-width: 75vw;
+      }
     </style>
   </head>
   <body>
@@ -40,6 +43,9 @@
     </div>
     <span>
       <label>URL: <input type="url" id="url" placeholder="https://example.com/playlist.m3u8"></label>
+    </span>
+    <span>
+      <label>Proxy?<input type="checkbox" id="proxy"></label>
       <button id="convert">Convert</button>
     </span>
     <p>Status: <span id="status">Write a url and click convert</span></p>
