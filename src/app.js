@@ -1,94 +1,169 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
+// Load ffmpeg
 const ffmpeg = new FFmpeg();
 
-ffmpeg.on("log", ({ message }) => {
-  console.log(`[FFmpeg]: ${message}`)
-})
+ffmpeg.on('log', ({ type, message }) => {
+  console.log(`[FFmpeg]: ${type}: ${message}`);
+});
 
-const base = "https://unpkg.com/@ffmpeg/core@0.12.2/dist/esm";
+const base = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
+const proxyUrl = 'https://api.fsh.plus/file?url=';
 (async()=>{
   await ffmpeg.load({
     coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
     wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm')
   })
   document.getElementById('loading').style.display = 'none';
-})()
+})();
 
-function setStatus(txt) {
+// Workings
+function setStatus(txt, extra) {
+  console.log(txt, extra??'');
   document.getElementById('status').innerText = txt;
 }
 
 async function fetchM3U8(url) {
-  setStatus('Fetching...');
   let proxy = document.getElementById('proxy').checked;
-  let content = await fetch(proxy?'https://api.fsh.plus/file?url='+encodeURIComponent(url):url);
+  let content = await fetch(proxy?proxyUrl+encodeURIComponent(url):url);
   content = await content.text();
   if (content.includes('#EXT-X-STREAM-INF')) {
-    console.log('Fetched playlist');
-    setStatus('Playlist fetched, fetching highest quality video...');
-    let bm = content
+    setStatus('Playlist fetched, fetching highest quality video ...');
+    // Audio
+    let audioPlaylist = null;
+    if ((/#EXT-X-MEDIA:.*?TYPE=AUDIO/).test(content)) {
+      // Get first one, highest bitrate requires fetching all
+      let audioUrl = content
+        .match(/^#EXT-X-MEDIA:.*?TYPE=AUDIO.*?$/gm);/*
+        .map(c=>Number(c.match(/(?:AVERAGE-BANDWIDTH|BANDWIDTH)=([0-9])+?,?/)[1]))
+        .sort((a,b)=>b-a)[0];*/
+      audioUrl = audioUrl[0].match(/URI="(.*?)"/)[1];
+      audioUrl = new URL(audioUrl, url).href;
+      audioPlaylist = await fetchM3U8(audioUrl);
+      setStatus('Audio fetched', audioUrl);
+    }
+    // Video
+    let bandwidth = content
       .match(/^#EXT-X-STREAM-INF:.+?$/gm)
-      .map(c=>Number(c.match(/BANDWIDTH=[0-9]+?,/)[0]
-      .match(/[0-9]+/)[0]))
+      .map(c=>Number(c.match(/(?:AVERAGE-BANDWIDTH|BANDWIDTH)=([0-9])+?,?/)[1]))
       .sort((a,b)=>b-a)[0];
-    let reg = new RegExp(`#EXT-X-STREAM-INF:.*?,BANDWIDTH=${bm},.*?`);
-    let g = content.split('\n').findIndex(i=>i.match(reg));
-    if (g<0) throw new Error('Playlist without biggest bandwidth video?');
-    let u = content.split('\n')[g+1];
-    let uu = new URL(u, url).href;
-    console.log('Fetching video: '+uu)
-    setStatus('Video fetched');
-    let newCon = await fetchM3U8(uu);
-    return [uu, newCon[1]];
+    let reg = new RegExp(`#EXT-X-STREAM-INF:.*?,?(AVERAGE-BANDWIDTH|BANDWIDTH)=${bandwidth},?.*?`);
+    let video = content.split('\n').findIndex(i=>i.match(reg));
+    if (video<0) throw new Error('Playlist without biggest bandwidth video?');
+    video = content.split('\n')[video+1];
+    video = new URL(video, url).href;
+    let videoPlaylist = await fetchM3U8(video);
+    setStatus('Playlist fetched', video);
+    return {
+      url: video,
+      content: videoPlaylist.content,
+      additional: audioPlaylist
+    };
   } else {
-    console.log('Fetched video');
-    setStatus('Video fetched');
-    return [url, content];
+    setStatus('Media fetched');
+    return {
+      url,
+      content: content,
+      additional: null
+    };
   }
 }
 async function fetchSegments(m3u8) {
   setStatus('Fetching segments...');
-  const baseUrl = m3u8[0].substring(0, m3u8[0].lastIndexOf("/") + 1);
-  const lines = m3u8[1].split("\n");
+  // Meta
+  const baseUrl = m3u8.url.substring(0, m3u8.url.lastIndexOf('/')+1);
+  const lines = m3u8.content.split('\n');
   const segments = [];
 
   let proxy = document.getElementById('proxy').checked;
 
+  // Init
+  if (m3u8.content.includes('#EXT-X-MAP:URI=')) {
+    let init = m3u8.content.split('#EXT-X-MAP:URI="')[1].split('"')[0];
+    let initUrl = new URL(init, baseUrl).href;
+    setStatus(`Fetching init`, initUrl);
+    if (proxy) initUrl = proxyUrl+encodeURIComponent(initUrl);
+    segments.push({ name: init, data: await fetchFile(initUrl) });
+  }
+
+  // Fetching segments
   for (let i = 0; i<lines.length; i++) {
     let line = lines[i];
     if (line && !line.startsWith("#")) {
       let segmentUrl = new URL(line, baseUrl).href;
-      console.log(`Fetching segment: ${segmentUrl}`);
-      setStatus(`Fetching segment ${i}...`);
-      if (proxy) segmentUrl = 'https://api.fsh.plus/file?url='+encodeURIComponent(segmentUrl);
+      setStatus(`Fetching segment ${i}...`, segmentUrl);
+      if (proxy) segmentUrl = proxyUrl+encodeURIComponent(segmentUrl);
       segments.push({ name: line, data: await fetchFile(segmentUrl) });
     }
   }
   return segments;
 }
 
+async function ensureDirs(path) {
+  let parts = path.slice(1).split('/').filter(p=>p.length).slice(0,-1);
+  let current = '';
+
+  for (const part of parts) {
+    current += '/' + part;
+    try {
+      await ffmpeg.listDir(current);
+    } catch (_) {
+      await ffmpeg.createDir(current);
+    }
+  }
+}
+
+
 document.getElementById('convert').onclick = async function(){
+  // Fetches
   let url = document.getElementById('url').value;
+  setStatus('Fetching...');
   let m3u8 = await fetchM3U8(url);
   let segments = await fetchSegments(m3u8);
+  let audioSegments = [];
+  if (m3u8.additional) audioSegments = await fetchSegments(m3u8.additional);
 
-  setStatus('Writing files...');
-  for (let { name, data } of segments) {
-    await ffmpeg.writeFile(name, data);
+  // Writing
+  for (let { name, data } of segments.concat(audioSegments)) {
+    setStatus('Writing '+name);
+    try {
+      await ensureDirs(name);
+      await ffmpeg.writeFile(name, data);
+    } catch(err) {
+      setStatus('Could not write '+name, err);
+      return;
+    }
   }
 
   setStatus('Writing playlist...');
-  await ffmpeg.writeFile("playlist.m3u8", m3u8[1]);
+  await ffmpeg.writeFile('/video.m3u8', m3u8.content);
+  if (m3u8.additional) {
+    await ffmpeg.writeFile('/audio.m3u8', m3u8.additional.content);
+  }
+
+  // Convert
   setStatus('Converting...');
-  await ffmpeg.exec([
+  let exec = [
     '-allowed_extensions', 'ALL',
-    '-i', 'playlist.m3u8',
-    '-c', 'copy',
+    '-i', '/video.m3u8'
+  ];
+  if (m3u8.additional) {
+    exec = exec.concat([
+      '-i', '/audio.m3u8',
+      '-c:v', 'copy',
+      '-c:a', 'aac'
+    ]);
+  } else {
+    exec = exec.concat([
+      '-c', 'copy'
+    ]);
+  }
+  exec = exec.concat([
     '-bsf:a', 'aac_adtstoasc',
     'output.mp4'
   ]);
+  await ffmpeg.exec(exec);
   const data = await ffmpeg.readFile('output.mp4');
   const videoBlob = new Blob([data.buffer], { type: 'video/mp4' });
   setStatus('Done!');
