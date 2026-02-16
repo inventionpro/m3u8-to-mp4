@@ -44,17 +44,29 @@ async function fetchM3U8(url) {
       setStatus('Audio fetched', audioUrl);
     }
     // Video
-    let bandwidth = content
-      .match(/^#EXT-X-STREAM-INF:.+?$/gm)
-      .map(c=>Number(c.match(/(?:AVERAGE-BANDWIDTH|BANDWIDTH)=([0-9])+?,?/)[1]))
-      .sort((a,b)=>b-a)[0];
-    let reg = new RegExp(`#EXT-X-STREAM-INF:.*?,?(AVERAGE-BANDWIDTH|BANDWIDTH)=${bandwidth},?.*?`);
+    let sources = content
+      .match(/^#EXT-X-STREAM-INF:.+?$/gmi)
+      .map(c=>{
+        console.log(c)
+        let resp = (c.match(/RESOLUTION=([0-9]+x[0-9]+),?/i)[1]??'1x1').split('x');
+        return {
+          rawres: resp.join('x'),
+          res: resp[0]*resp[1],
+          band: Number(c.match(/(?:AVERAGE-BANDWIDTH|BANDWIDTH)=([0-9]+),?/i)[1])
+        };
+      })
+      .sort((a,b)=>{
+        if (a.res===b.res) return b.band-a.band;
+        return b.res-a.res;
+      });
+    setStatus('Sources found', sources);
+    let reg = new RegExp(`#EXT-X-STREAM-INF:.*?,?((?:AVERAGE-BANDWIDTH|BANDWIDTH)=${sources[0].band}|RESOLUTION=${sources[0].rawres}),?.*?`, 'i');
     let video = content.split('\n').findIndex(i=>i.match(reg));
-    if (video<0) throw new Error('Playlist without biggest bandwidth video?');
+    if (video<0) throw new Error('Could not find source?', reg);
     video = content.split('\n')[video+1];
     video = new URL(video, url).href;
     let videoPlaylist = await fetchM3U8(video);
-    setStatus('Playlist fetched', video);
+    setStatus('Video playlist fetched', video);
     return {
       url: video,
       content: videoPlaylist.content,
