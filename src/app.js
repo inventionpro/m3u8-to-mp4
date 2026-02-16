@@ -32,16 +32,21 @@ async function fetchM3U8(url) {
     setStatus('Playlist fetched, fetching highest quality video ...');
     // Audio
     let audioPlaylist = null;
-    if ((/#EXT-X-MEDIA:.*?TYPE=AUDIO/).test(content)) {
+    if ((/#EXT-X-MEDIA:.*?TYPE=AUDIO/i).test(content)) {
       // Get first one, highest bitrate requires fetching all
-      let audioUrl = content
-        .match(/^#EXT-X-MEDIA:.*?TYPE=AUDIO.*?$/gm);/*
-        .map(c=>Number(c.match(/(?:AVERAGE-BANDWIDTH|BANDWIDTH)=([0-9])+?,?/)[1]))
-        .sort((a,b)=>b-a)[0];*/
-      audioUrl = audioUrl[0].match(/URI="(.*?)"/)[1];
-      audioUrl = new URL(audioUrl, url).href;
-      audioPlaylist = await fetchM3U8(audioUrl);
-      setStatus('Audio fetched', audioUrl);
+      let audioSources = content
+        .match(/^#EXT-X-MEDIA:.*?TYPE=AUDIO.*?$/gmi)
+        .sort((a,b)=>{
+          console.log(a,b)
+          // Twitter puts quality in group id, check if twitter for better quality
+          if (!(/GROUP-ID="audio-[0-9]+?"/i).test(a)) return 0;
+          return Number(b.match(/GROUP-ID="audio-([0-9]+?)"/i)[1])-Number(a.match(/GROUP-ID="audio-([0-9]+?)"/i)[1]);
+        });
+      setStatus('Audio sources found', audioSources);
+      audioSources = audioSources[0].match(/URI="(.*?)"/)[1];
+      audioSources = new URL(audioSources, url).href;
+      audioPlaylist = await fetchM3U8(audioSources);
+      setStatus('Audio fetched', audioSources);
     }
     // Video
     let sources = content
@@ -59,7 +64,7 @@ async function fetchM3U8(url) {
         if (a.res===b.res) return b.band-a.band;
         return b.res-a.res;
       });
-    setStatus('Sources found', sources);
+    setStatus('Video sources found', sources);
     let reg = new RegExp(`#EXT-X-STREAM-INF:.*?,?((?:AVERAGE-BANDWIDTH|BANDWIDTH)=${sources[0].band}|RESOLUTION=${sources[0].rawres}),?.*?`, 'i');
     let video = content.split('\n').findIndex(i=>i.match(reg));
     if (video<0) throw new Error('Could not find source?', reg);
