@@ -105,13 +105,29 @@ async function fetchSegments(m3u8) {
   }
 
   // Fetching segments
+  let retries = 0;
   for (let i = 0; i<lines.length; i++) {
     let line = lines[i];
     if (line && !line.startsWith("#")) {
       let segmentUrl = new URL(line, baseUrl).href;
       setStatus(`Fetching segment ${i}...`, segmentUrl);
       if (proxy) segmentUrl = proxyUrl+encodeURIComponent(segmentUrl);
-      segments.push({ name: line, data: await fetchFile(segmentUrl) });
+      let data;
+      try {
+        data = await fetchFile(segmentUrl);
+      } catch(err) {
+        retries++;
+        if (retries>4) {
+          setStatus('Could not fetch all segments.', err);
+          throw new Error('Could not fetch all segments.');
+        }
+        setStatus(`Failed to fetch segment ${i}, retying in 5 seconds.`, err);
+        await new Promise(resolve=>setTimeout(resolve, 5000));
+        i--;
+        continue;
+      }
+      retries = 0;
+      segments.push({ name: line, data });
     }
   }
   return segments;
@@ -136,7 +152,13 @@ document.getElementById('convert').onclick = async function(){
   // Fetches
   let url = document.getElementById('url').value;
   setStatus('Fetching...');
-  let m3u8 = await fetchM3U8(url);
+  let m3u8;
+  try {
+    m3u8 = await fetchM3U8(url);
+  } catch(err) {
+    setStatus('Could not fetch m3u8, turn proxy on?', err);
+    return;
+  }
   let segments = await fetchSegments(m3u8);
   let audioSegments = [];
   if (m3u8.additional) audioSegments = await fetchSegments(m3u8.additional);
@@ -155,9 +177,7 @@ document.getElementById('convert').onclick = async function(){
 
   setStatus('Writing playlist...');
   await ffmpeg.writeFile('/video.m3u8', m3u8.content);
-  if (m3u8.additional) {
-    await ffmpeg.writeFile('/audio.m3u8', m3u8.additional.content);
-  }
+  if (m3u8.additional) await ffmpeg.writeFile('/audio.m3u8', m3u8.additional.content);
 
   // Convert
   setStatus('Converting...');
