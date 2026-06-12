@@ -14,14 +14,18 @@ const proxyUrl = 'https://api.fsh.plus/file?url=';
   await ffmpeg.load({
     coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, 'text/javascript'),
     wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm')
-  })
+  });
+  document.getElementById('convert').disabled = false;
   document.getElementById('loading').style.display = 'none';
 })();
 
 // Workings
 function setStatus(txt, extra) {
   console.log(txt, extra??'');
-  document.getElementById('status').innerText = txt;
+  let p = document.createElement('p');
+  p.innerText = document.querySelector('#status span').innerText;
+  document.getElementById('status').insertAdjacentElement('afterbegin', p);
+  document.querySelector('#status span').innerText = txt;
 }
 
 async function fetchM3U8(url) {
@@ -37,7 +41,6 @@ async function fetchM3U8(url) {
       let audioSources = content
         .match(/^#EXT-X-MEDIA:.*?TYPE=AUDIO.*?$/gmi)
         .sort((a,b)=>{
-          console.log(a,b)
           // Twitter puts quality in group id, check if twitter for better quality
           if (!(/GROUP-ID="audio-[0-9]+?"/i).test(a)) return 0;
           return Number(b.match(/GROUP-ID="audio-([0-9]+?)"/i)[1])-Number(a.match(/GROUP-ID="audio-([0-9]+?)"/i)[1]);
@@ -180,29 +183,43 @@ document.getElementById('convert').onclick = async function(){
   if (m3u8.additional) await ffmpeg.writeFile('/audio.m3u8', m3u8.additional.content);
 
   // Convert
-  setStatus('Converting...');
+  let container = document.getElementById('container').value;
+  let output = 'output.'+container;
+  let vf = document.getElementById('format-v').value;
+  let af = document.getElementById('format-a').value;
   let exec = [
     '-allowed_extensions', 'ALL',
     '-i', '/video.m3u8'
   ];
-  if (m3u8.additional) {
-    exec = exec.concat([
-      '-i', '/audio.m3u8',
-      '-c:v', 'copy',
-      '-c:a', 'aac'
-    ]);
-  } else {
-    exec = exec.concat([
-      '-c', 'copy'
-    ]);
-  }
-  exec = exec.concat([
-    '-bsf:a', 'aac_adtstoasc',
-    'output.mp4'
+  if (m3u8.additional) exec = exec.concat([
+    '-i', '/audio.m3u8',
+    '-map', '0:v:0',
+    '-map', '1:a:0'
   ]);
-  await ffmpeg.exec(exec);
-  const data = await ffmpeg.readFile('output.mp4');
-  const videoBlob = new Blob([data.buffer], { type: 'video/mp4' });
+  // Copy format
+  if (vf==='copy'&&af==='copy') {
+    exec = exec.concat([ '-c', 'copy' ]);
+  } else {
+    // Video formats
+    if (vf==='VP9') exec = exec.concat([ '-c:v', 'libvpx-vp9' ]);
+    if (['H265','H264'].includes(vf)) exec = exec.concat([
+      '-c:v', 'libx'+vf.replace('H',''),
+      '-crf', document.getElementById('crf').value
+    ]);
+    // Audio formats
+    exec = exec.concat([ '-c:a', af ]);
+    if (af==='aac') exec = exec.concat([ '-bsf:a', 'aac_adtstoasc' ]);
+  }
+  exec = exec.concat([ output ]);
+  setStatus('Converting...', exec);
+  try {
+    await ffmpeg.exec(exec);
+  } catch(err) {
+    setStatus('Could not convert', err);
+    return;
+  }
+  const data = await ffmpeg.readFile(output);
+  const videoBlob = new Blob([data.buffer], { type: 'video/'+container });
   setStatus('Done!');
   document.getElementById('video').src = URL.createObjectURL(videoBlob);
 }

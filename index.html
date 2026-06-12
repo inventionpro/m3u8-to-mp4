@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>M3U8 to MP4 Online</title>
-    <meta property="og:title" content="M3U8 to MP4 Online">
-    <meta name="twitter:title" content="M3U8 to MP4 Online">
-    <meta name="description" content="Convert m3u8 urls into mp4s in your browser locally using ffmpeg.">
-    <meta property="og:description" content="Convert m3u8 urls into mp4s in your browser locally using ffmpeg.">
-    <meta name="twitter:description" content="Convert m3u8 urls into mp4s in your browser locally using ffmpeg.">
+    <title>M3U8 Converter Online</title>
+    <meta property="og:title" content="M3U8 Converter Online">
+    <meta name="twitter:title" content="M3U8 Converter Online">
+    <meta name="description" content="Convert m3u8 urls into mp4 in your browser locally using ffmpeg.">
+    <meta property="og:description" content="Convert m3u8 urls into mp4 in your browser locally using ffmpeg.">
+    <meta name="twitter:description" content="Convert m3u8 urls into mp4 in your browser locally using ffmpeg.">
     <!-- ------- -->
     <meta charset="UTF-8">
     <meta name="robots" content="index, follow">
@@ -27,39 +27,79 @@
         align-items: center;
         justify-content: center;
         width: 100dvw;
-        height: 100dvh;
+        min-height: 100dvh;
+        overflow: hidden auto;
       }
-      #loading {
-        position: absolute;
-        left: 0;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: var(--bg-1);
-        z-index: 999;
+      select {
+        margin: 2px;
       }
+      table {
+        border-spacing: 0px;
+      }
+      td, th {
+        padding: 5px;
+        border: 1px solid var(--bg-3);
+      }
+      tr:first-child > :first-child { border-top-left-radius: 1rem }
+      tr:first-child > :last-child { border-top-right-radius: 1rem }
+      tr:last-child > :first-child { border-bottom-left-radius: 1rem }
+      tr:last-child > :last-child { border-bottom-right-radius: 1rem }
+      td[colspan] {
+        text-align: center;
+      }
+      #loading { color: var(--red-1) }
       video {
-        max-width: 75dvw;
-        max-height: 75dvh;
+        max-width: 70dvw;
+        max-height: 70dvh;
       }
     </style>
-    <script type="module" crossorigin src="./assets/index-zLAbXjTx.js"></script>
+    <script type="module" crossorigin src="./assets/index-C58k_Q5b.js"></script>
   </head>
   <body>
-    <div id="loading">
-      <p>Loading FFmpeg, please wait...</p>
-    </div>
-    <span>
-      <label>URL: <input type="url" id="url" placeholder="https://example.com/playlist.m3u8"></label>
-    </span>
-    <span>
-      <label>Proxy?<input type="checkbox" id="proxy"></label>
-      <button id="convert">Convert</button>
-    </span>
-    <p>Status: <span id="status">Write a url and click convert</span></p>
+    <h1>M3U8 Converter Online</h1>
+    <table>
+      <tr>
+        <th>Input</th>
+        <td>
+          <label>URL: <input type="url" id="url" placeholder="https://example.com/playlist.m3u8"></label>
+          <br>
+          <label>Proxy?<input type="checkbox" id="proxy"></label>
+        </td>
+      </tr>
+      <tr>
+        <th>Output</th>
+        <td>
+          <label>Container <select id="container">
+            <option value="mp4">MP4</option>
+            <option value="webm">WebM</option>
+          </select></label>
+          <br>
+          <label>Video <select id="format-v" onchange="h26.style.display=this.value.startsWith('H26')?'':'none'">
+            <option value="copy">Copy</option>
+            <option>H264</option>
+            <option>H265</option>
+            <option>VP9</option>
+          </select></label>
+          <label id="h26" style="display:none"><br>CRF <input id="crf" type="range" min="0" max="51" value="18"></label>
+          <br>
+          <label>Audio <select id="format-a">
+            <option value="copy">Copy</option>
+            <option value="aac">AAC</option>
+            <option value="libmp3lame">MP3</option>
+            <option value="libopus">Opus</option>
+          </select></label>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2">
+          <button id="convert" disabled>Convert</button>
+          <p id="loading">Loading FFmpeg, please wait...</p>
+          <details id="status">
+            <summary>Status: <span>Write a url and click convert</span></summary>
+          </details>
+        </td>
+      </tr>
+    </table>
     <video controls id="video"></video>
   </body>
 </html>
